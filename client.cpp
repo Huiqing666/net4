@@ -15,8 +15,8 @@
 using namespace std;
 
 void GET(int clientDescriptors, char *URL){
-	char request[1000]={0};
-	sprinf(request,"GET %s HTTP/1.0\r\n\r\n", URL);
+	char *request;
+	sprintf(request,"GET %s HTTP/1.0\r\n\r\n", URL);
 	int data=send(clientDescriptors,request,strlen(request),0);
 
 }
@@ -25,7 +25,7 @@ int main(int argc,char *argv[]){
 	int clientDescriptors, proxyPort, maxDescriptors=0,clientNumber,input_bytes;
 	char *proxyAddr, *URL;
 	char *input, errorBuffer[1024], receiveBuffer[1000000];
-	struct hostent host;
+	struct hostent *host;
 
 
 
@@ -75,8 +75,8 @@ int main(int argc,char *argv[]){
 		fprintf(stderr,"No data received. Exiting...\n");
 		exit(1);
 	}else{
-		string recvd;
-	    strncpy(recvd,receiveBuffer,data);
+		char recvd[1000000];
+	        strncpy(recvd,receiveBuffer,data);
 		cout<<recvd<<endl;
 	}
 
@@ -89,3 +89,4 @@ int main(int argc,char *argv[]){
 	close(clientDescriptors);
 	return 0;
 }
+
