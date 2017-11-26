@@ -133,7 +133,7 @@ string receiveFromWebServerModified(string URL,string time){
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);
 	}
-	string message="GET http://"+URL+" HTTP/1.0\r\n\r\n";
+	string message="GET http://"+url+" HTTP/1.0\r\n"+"If-Modified-Since: "+sinceTime+"\r\n\r\n";
 	cout<<message<<endl;
 	int bytes=0;
 	if((bytes=send(httpsd,message.c_str(),message.length(),0))<=0){
