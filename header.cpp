@@ -93,8 +93,9 @@ vector <string> parseString(string str, string delim){
 	vector<string> tokens;
 	int i=0;
 	int length=str.length();
-	size_t pos=str.find(delim,i);
+	size_t pos;
 	while(i<length){
+		pos=str.find(delim,i);
 		if(pos==string::npos){//end of string
 			tokens.push_back(str.substr(i));
 			break;
