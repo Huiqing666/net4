@@ -7,6 +7,8 @@
 #include <netinet/ip.h>
 #include <netdb.h>
 #include <sys/select.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
@@ -14,6 +16,7 @@
 #include <vector>
 #include <map>
 #include <limits.h>
+//extern "C";
 
 #include "header.h"
 using namespace std;
@@ -27,97 +30,6 @@ int maxNumOfClients=3;
 char* format = "%a, %d %b %Y %H:%M:%S %Z";
 map<string, cache*> cacheEntry;
 
-string getURL(char * recvbuffer){
-	string URL;
-	char* token = strtok(recvbuffer," ");
-	char* tokens[3];
-	int i=0;  
-    while(token!=NULL)  
-    {  
-         tokens[i]=token; 
-         token=strtok(NULL," "); 
-         i++; 
-    }
-    return tokens[1];
-}
-
-cache* parseResponse(string response){
-	header* header=new header;
-	cache* cache=new cache;
-	string delim="\r\n\r\n"; //split header and body
-    vector<string> recv = parseString(response, delim); 
-
-  if(recv.size() == 1 || recv.size() > 2)
-  {
-    cout<<"Reponse error. Exiting..."<<endl;
-    exit(1);
-  }
-  //parse Header
-  string head = recv.at(0);
-  string delim2 = "\r\n";
-  vector<string> headercontent = parseString(head, delim2);
-  if(headercontent.size() == 0)
-  {
-    cout<<"Header error. Exiting..."<<endl;
-    exit(1);
-  }
-
-  int size = headercontent.size();
-  vector<string> contents;
-  string delim3 = ": ";
-  for(int i=1; i<size; i++) 
-  {
-    contents = parseString(headercontent.at(i), delim3);
-
-    if(contents.at(0)=="Date") header->date=contents.at(1);
-    else if(contents.at(0) == "Expires")
-      header->expires=contents.at(1);
-    else if(contents.at(0) == "Last-Modified")
-      header->lastModified=contents.at(1);
-
-  }
-
-  //get current time
-  
-  time_t tt=time(NULL);
-  struct tm* time;
-  time=gmtime(&tt);
-  time_t current = timegm(time); 
-  header->lastAccessed=current;
-  
-  //add in the cache
-  cache->header=header;
-  cache->body=response;
-
-  return cache;
-}
-vector <string> parseString(string str, string delim){
-	vector<string> tokens;
-	int i=0;
-	int length=str.length();
-	size_t pos=str.find(delim,i);
-	while(i<length){
-		if(pos==string::npos){//end of string
-			tokens.push_back(str.substr(i));
-			break;
-
-		}
-		tokens.push_back(str.substr(i,int(pos)-i));
-		i=int(pos)+delim.length();
-	}
-	return tokens;
-}
-cache* stamp(cache* newpage){//stamp(cache is not full)
-	header* header=newpage->header;
-	time_t tt=time(NULL);
-    struct tm* time;
-    time=gmtime(&tt);
-    time_t current = timegm(time); 
-    header->lastAccessed=current;
-	newpage->header=header;
-
-	return newpage;
-}
 string receiveFromWebServer(string URL){
 	string server,filename;
 	char errorbuffer[256],recvbuffer[1000000];
@@ -135,28 +47,32 @@ string receiveFromWebServer(string URL){
 	}
 	//retrieve filename from webserver
 	int httpsd;
-	if((httpsd)=socket(AF_INET,SOCK_STREAM,0)==-1){
-		fprintf(stderr, "%s\n", "HTTP socket creation error");
-		char* errorMessage=strerror_r(errno,errorbuffer,256);
-		exit(1);
-	}
+	
 
 	struct addrinfo *httpinfo;
 	struct addrinfo hints;
 	memset(&hints,0,sizeof(hints));
 	hints.ai_family=AF_INET;
 	hints.ai_socktype=SOCK_STREAM;
+        
+        cout<<URL<<endl;
 	if(getaddrinfo(server.c_str(),"http",&hints,&httpinfo)!=0){
 		fprintf(stderr,"getaddrinfo error\n");
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);
 	}
+        if((httpsd=socket(httpinfo->ai_family,httpinfo->ai_socktype,httpinfo->ai_protocol))==-1){
+		fprintf(stderr, "%s\n", "HTTP socket creation error");
+		char* errorMessage=strerror_r(errno,errorbuffer,256);
+		exit(1);
+	}
+         cout<<httpsd<<endl;
 	if(connect(httpsd,httpinfo->ai_addr,httpinfo->ai_addrlen)==-1){
 		fprintf(stderr,"connect error\n");
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);
 	}
-	string message="GET"+URL+"HTTP/1.0\r\n\r\n";
+	string message="GET http://"+URL+" HTTP/1.0\r\n\r\n";
 	cout<<message<<endl;
 	int bytes=0;
 	if((bytes=send(httpsd,message.c_str(),message.length(),0))<=0){
@@ -170,8 +86,12 @@ string receiveFromWebServer(string URL){
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);		
 	}
-	string str;
-	strncpy(str,recvbuffer,bytes2);
+        cout<<bytes2<<endl;
+	char st[1000000];
+	strncpy(st,recvbuffer,bytes2);
+        //cout<<st<<endl;
+        string str=st;
+        //cout<<str<<endl;
 	return str;
 }
 
@@ -192,7 +112,7 @@ string receiveFromWebServerModified(string URL,string time){
 	}
 	//retrieve filename from webserver
 	int httpsd;
-	if((httpsd)=socket(AF_INET,SOCK_STREAM,0)==-1){
+	if((httpsd=socket(AF_INET,SOCK_STREAM,0))==-1){
 		fprintf(stderr, "%s\n", "HTTP socket creation error");
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);
@@ -213,7 +133,7 @@ string receiveFromWebServerModified(string URL,string time){
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);
 	}
-	string message="GET"+URL+"HTTP/1.0\r\n\r\n";
+	string message="GET http://"+URL+" HTTP/1.0\r\n\r\n";
 	cout<<message<<endl;
 	int bytes=0;
 	if((bytes=send(httpsd,message.c_str(),message.length(),0))<=0){
@@ -227,9 +147,14 @@ string receiveFromWebServerModified(string URL,string time){
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);		
 	}
-	char* str;
-	strncpy(str,recvbuffer,bytes2);
-	char* temp=str;
+
+
+	char st[1000000];
+	strncpy(st,recvbuffer,bytes2);
+        //cout<<st<<endl;
+        string str=st;
+ 
+	string temp=str;
 	vector<string> contents=parseString(temp,"\r\n");
 	string status=contents.at(0);
 	vector<string> modify=parseString(status," ");
@@ -244,12 +169,13 @@ void cacheInsert(string URL,cache* newpage){
 	}
 	else{//cache is full, find a victim
 		//int i=0;
-		time_t tt=time(NULL);
+	time_t tt=time(NULL);
     	struct tm* time;
     	time=gmtime(&tt);
     	time_t current = timegm(time);
     	map<string,cache*>::iterator victim;
     	double timediff,maxTime=INT_MIN;
+        cout<<"Inserting"<<URL<<"to Cache now..."<<endl;
 
     	map<string,cache*>::iterator vic=cacheEntry.begin();
     	for(;vic!=cacheEntry.end();vic++){
@@ -273,8 +199,9 @@ void cacheUpdate(string URL, cache* newpage){
 }
 cache* cacheMiss(string URL){
 	cout<<"cache miss..."<<endl;
+
 	string page=receiveFromWebServer(URL);
-	cache* newpage=parseResponse(URL);
+	cache* newpage=parseResponse(page);
 	cacheInsert(URL,newpage);
 
 	return newpage;
@@ -330,7 +257,7 @@ int main(int argc, char *argv[]) {
 
 	int sockId, newSocketId, port, maxDescriptors;
 	char *proxyIP;
-	int lenOfSockaddr_in;
+	u_int lenOfSockaddr_in;
 	struct hostent *host;
 	int selectVal;
 	int numOfClients = 0;
@@ -390,27 +317,28 @@ int main(int argc, char *argv[]) {
 	FD_SET(sockId, &allDescriptors);
 	maxDescriptors = sockId;
 	printf("the # of descriptors are: %d\n", maxDescriptors);
-	char copybuffer[1024],recvbuffer[1024];
+	char copybuffer[1000000],recvbuffer[1000000];
 	int i;
 	while(1){
 		clientDescriptors=allDescriptors;
 		memset(copybuffer,0,sizeof(copybuffer));
 		memset(recvbuffer,0,sizeof(recvbuffer));
-		if(select(sockId+1,&clientDescriptors,NULL,NULL,NULL)==-1){
+		if(select(maxDescriptors+1,&clientDescriptors,NULL,NULL,NULL)==-1){
 			fprintf(stderr, "Select error\n");
       		char* errorMessage = strerror_r(errno, errorbuffer, 256);
       		//printf(errorMessage);
       		exit(1);
 		}
-		//for every 
-		for(i=3;i<maxDescriptors;i++){
-			if(FD_SET(i,&clientDescriptors)){
+                //cout<<sockId<<endl;
+		for(i=3;i<=maxDescriptors;i++){
+			if(FD_ISSET(i,&clientDescriptors)){
 				if(i==sockId){
 					newSocketId=accept(sockId,(struct sockaddr*)&clientSockAddr,&lenOfSockaddr_in);
 					if(newSocketId<0){
 						fprintf(stderr, "Select error\n");
-      					char* errorMessage = strerror_r(errno, errorbuffer, 256);
-      					printf(errorMessage);
+      						char* errorMessage = strerror_r(errno, errorbuffer, 256);
+						exit(1);
+      					//printf(errorMessage);
 
 					}else{
 						FD_SET(newSocketId,&allDescriptors);
@@ -420,6 +348,7 @@ int main(int argc, char *argv[]) {
 
 				}else{
 					int re;
+					cout<<"recv..."<<endl;
 
 					if(re=recv(i,recvbuffer,sizeof(recvbuffer),0)<=0){
 						FD_CLR(i,&allDescriptors);
@@ -431,6 +360,7 @@ int main(int argc, char *argv[]) {
 					if(cacheEntry.count(URL) == 0){//cache miss
 					cache* page=cacheMiss(URL);
 					string body=page->body;
+                                        cout<<i;
 					send(i,body.c_str(),body.length(),0);
 
 					}
