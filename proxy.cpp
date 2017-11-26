@@ -133,7 +133,7 @@ string receiveFromWebServerModified(string URL,string time){
 		char* errorMessage=strerror_r(errno,errorbuffer,256);
 		exit(1);
 	}
-	string message="GET http://"+url+" HTTP/1.0\r\n"+"If-Modified-Since: "+sinceTime+"\r\n\r\n";
+	string message="GET http://"+URL+" HTTP/1.0\r\n"+"If-Modified-Since: "+time+"\r\n\r\n";
 	cout<<message<<endl;
 	int bytes=0;
 	if((bytes=send(httpsd,message.c_str(),message.length(),0))<=0){
@@ -163,9 +163,11 @@ string receiveFromWebServerModified(string URL,string time){
 
 }
 void cacheInsert(string URL,cache* newpage){
+        cout<<"cache size is "<<cacheEntry.size()<<endl;
 	if(cacheEntry.size()<maxCacheSize){
 		newpage=stamp(newpage);//find invalid cache entry
 		cacheEntry.insert(make_pair(URL,newpage));
+                cout<<"put "<<URL<<"into cache"<<endl;
 	}
 	else{//cache is full, find a victim
 		//int i=0;
@@ -348,7 +350,7 @@ int main(int argc, char *argv[]) {
 
 				}else{
 					int re;
-					cout<<"recv..."<<endl;
+					cout<<"receving from webserver"<<endl;
 
 					if(re=recv(i,recvbuffer,sizeof(recvbuffer),0)<=0){
 						FD_CLR(i,&allDescriptors);
@@ -360,7 +362,7 @@ int main(int argc, char *argv[]) {
 					if(cacheEntry.count(URL) == 0){//cache miss
 					cache* page=cacheMiss(URL);
 					string body=page->body;
-                                        cout<<i;
+                                        //cout<<i;
 					send(i,body.c_str(),body.length(),0);
 
 					}
